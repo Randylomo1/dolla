@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hft-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hft-server
+  template:
+    metadata:
+      labels:
+        app: hft-server
+    spec:
+      containers:
+      - name: server
+        image: hft-server:latest
+        envFrom:
+        - secretRef:
+            name: deriv-secrets
+        resources:
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        ports:
+        - containerPort: 3000
+      - name: tf-serving
+        image: tensorflow/serving:latest-gpu
+        args:
+        - --port=8500
+        - --model_name=market-predictor
+        - --model_base_path=/models/
+        volumeMounts:
+        - name: model-storage
+          mountPath: /models
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hft-server
+spec:
+  selector:
+    app: hft-server
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+  - protocol: TCP
+    port: 8500
+    targetPort: 8500
+  type: LoadBalancer
