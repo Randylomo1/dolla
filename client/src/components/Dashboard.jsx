@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { WebSocketService } from '../services/websocket';
+import { initWebSocket } from '../services/websocketService';
 
 export default function Dashboard() {
   const [marketData, setMarketData] = useState(null);
@@ -14,21 +14,26 @@ export default function Dashboard() {
       navigate('/?error=authentication_failed');
     }
     
-    const ws = new WebSocketService();
-    ws.connect('wss://localhost:3000');
+    const socket = initWebSocket(
+      (message) => {
+        switch(message.type) {
+          case 'MARKET_DATA':
+            setMarketData(prev => ({
+              ...prev,
+              [message.payload.symbol]: message.payload.quote
+            }));
+            break;
+          case 'AGENT_STATUS':
+            setAgents(message.payload);
+            break;
+        }
+      },
+      (status) => console.log('Connection status:', status)
+    );
 
-    ws.on('MARKET_DATA', data => {
-      setMarketData(prev => ({
-        ...prev,
-        [data.symbol]: data.quote
-      }));
-    });
-
-    ws.on('AGENT_STATUS', agents => {
-      setAgents(agents);
-    });
-
-    return () => ws.disconnect();
+    return () => {
+      if(socket) socket.disconnect();
+    };
   }, []);
 
   return (

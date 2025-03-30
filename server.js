@@ -4,14 +4,12 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import fs from 'fs';
 import bodyParser from 'body-parser';
-import DerivAPIBasic from 'deriv-api';
 import { processMarketData } from './lib/marketDataProcessor.js';
 import { manageRisk } from './lib/riskEngine.js';
 import { initAIAgents } from './lib/aiOrchestrator.js';
 import redis from './lib/aiWSService.js';
 import orderSplitter from './lib/orderSplitter.js';
-import DerivWS from './lib/derivWS';
-import PredictionEngine from './lib/predictionEngine';
+import PredictionEngine from './lib/predictionEngine.js';
 
 const app = express();
 
@@ -79,7 +77,7 @@ const io = new Server(httpServer, {
   httpCompression: true
 });
 
-const derivAPI = new DerivAPIBasic({ 
+const derivAPI = new DerivWS({ 
   app_id: process.env.DERIV_APP_ID,
   server: process.env.DERIV_SERVER || 'blue',
   onReady: () => console.log('Deriv WS connection established')

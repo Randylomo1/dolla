@@ -1,60 +1,49 @@
-import { io } from 'socket.io-client';
+export const initWebSocket = (messageHandler, statusHandler) => {
+  const authToken = localStorage.getItem('authToken');
+  const derivCredentials = JSON.parse(localStorage.getItem('deriv_credentials') || '{}');
 
-const SOCKET_URL = 'ws://localhost:3000';
-
-let socket = null;
-
-const initWebSocket = (onMessage, onStatusUpdate) => {
-  socket = io(SOCKET_URL, {
-    transports: ['websocket'],
-    autoConnect: true,
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    auth: {
-      token: localStorage.getItem('jwt')
+  const ws = new WebSocket(
+    `${import.meta.env.VITE_WS_URL}?token=${encodeURIComponent(authToken)}`,
+    {
+      headers: {
+        'Deriv-App-ID': import.meta.env.VITE_DERIV_APP_ID,
+        'Deriv-Auth-Token': derivCredentials?.token || ''
+      }
     }
-  });
-
-  socket.on('connect', () => {
-    console.log('WebSocket connection established');
-    onStatusUpdate('connected');
-  });
-
+  );
+  const socket = new WebSocket(`wss://${window.location.host}/ws/deriv`);
+  
+  socket.onopen = () => {
+    socket.send(JSON.stringify({
+      type: 'AUTH',
+      payload: derivCredentials
+    }));
+    statusHandler('connected');
+  };
+  
   socket.on('MARKET_DATA', (data) => {
     onMessage({ type: 'MARKET_DATA', payload: data });
   });
-
+  
   socket.on('AGENT_STATUS', (data) => {
     onMessage({ type: 'AGENT_STATUS', payload: data });
   });
-
+  
   socket.on('TRADE_SIGNAL', (data) => {
     onMessage({ type: 'TRADE_SIGNAL', payload: data });
   });
-
+  
   socket.on('disconnect', () => {
     console.log('WebSocket connection lost');
     onStatusUpdate('disconnected');
   });
-
+  
   socket.on('error', (error) => {
     console.error('WebSocket error:', error);
     onStatusUpdate('error');
   });
-
-  return socket;
+  
+  return {
+    disconnect: () => socket.close()
+  };
 };
-
-const subscribeToChannel = (channel) => {
-  if (socket) {
-    socket.emit('subscribe', channel);
-  }
-};
-
-const unsubscribeFromChannel = (channel) => {
-  if (socket) {
-    socket.emit('unsubscribe', channel);
-  }
-};
-
-export { initWebSocket, subscribeToChannel, unsubscribeFromChannel };
